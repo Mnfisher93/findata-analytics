@@ -95,27 +95,34 @@ Copy-Item .env.example .env
 
 Open `.env` in a text editor and paste your [EODHD API key](https://eodhd.com/register) (free tier works).
 
-> **No API key?** You can still run the project with synthetic data using `--synthetic` mode — no key required.
+> **No API key?** Choose option 2 or 5 in the menu to run with synthetic data — no key required.
 
 ### Usage
 
-**Run with real market data (requires API key):**
-
 ```bash
-uv run python main.py --fetch AAPL --analyze aapl_eod
+uv run python main.py
 ```
 
-**Run with synthetic data (no API key needed):**
+That's it — the program launches an interactive menu that guides you through everything:
 
-```bash
-uv run python main.py --synthetic --analyze synthetic_data
+```
+╔══════════════════════════════════════════════════════════════════╗
+║   📈  findata-analytics                                        ║
+║   Financial Data Pipeline & Quantitative Analytics               ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Choose a mode:
+
+  [1]  🌐  Fetch real data     — Pull EOD stock data from EODHD API
+  [2]  🧪  Generate synthetic   — Create GBM data + benchmark performance
+  [3]  📊  Analyze existing     — Run analytics on a table already in DuckDB
+  [4]  🚀  Full pipeline        — Fetch real data → analyze → charts (all-in-one)
+  [5]  🧪  Synthetic pipeline   — Generate data → analyze → charts (no API key)
+
+  [q]  Quit
 ```
 
-**Custom date range:**
-
-```bash
-uv run python main.py --fetch MSFT --start 2022-01-01 --end 2025-01-01 --analyze msft_eod
-```
+**Quick start (no API key needed):** choose option **5** to generate synthetic data, run all analytics, and produce charts in one step.
 
 All charts are saved to the `output/` directory automatically.
 
@@ -125,9 +132,8 @@ All charts are saved to the `output/` directory automatically.
 
 ```
                     ┌─────────────────────────────┐
-                    │         main.py (CLI)        │
-                    │   --fetch · --synthetic ·    │
-                    │        --analyze             │
+                    │      main.py (interactive)   │
+                    │   Menu → prompts → pipeline  │
                     └──────┬──────────┬────────────┘
                            │          │
               ┌────────────▼──┐  ┌────▼──────────────┐
@@ -206,12 +212,31 @@ The synthetic data generator supports two modes to demonstrate Python concurrenc
 
 Charts are generated with a dark-mode theme and saved to `output/`:
 
-- **Price with MAs & Bollinger Bands** — close price, 50/200-day MAs, ±2σ bands
-- **30-Day Rolling Volatility** — annualized volatility over time
-- **Drawdown from ATH** — percentage drop from running peak
-- **Equity Curves** — MA crossover strategy vs buy-and-hold benchmark
-- **Monthly Returns** — color-coded bar chart (green = positive, red = negative)
-- **Yearly Returns** — annual performance summary
+### Price with MAs & Bollinger Bands
+Close price overlaid with 50/200-day moving averages and ±2σ Bollinger Bands:
+
+![Price & Bollinger Bands](docs/price_bollinger.png)
+
+### Equity Curves — Strategy vs Buy-and-Hold
+MA crossover backtest ($10K start) compared against a passive benchmark:
+
+![Equity Curves](docs/equity_curves.png)
+
+### Drawdown from All-Time High
+Percentage decline from running peak, highlighting max drawdown:
+
+![Drawdown](docs/drawdown.png)
+
+### 30-Day Rolling Volatility
+Annualized volatility computed over a rolling 30-day window:
+
+![Rolling Volatility](docs/rolling_volatility.png)
+
+### Monthly & Yearly Returns
+
+| Monthly (color-coded) | Yearly (summary) |
+|---|---|
+| ![Monthly Returns](docs/monthly_returns.png) | ![Yearly Returns](docs/yearly_returns.png) |
 
 ---
 
