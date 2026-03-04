@@ -7,8 +7,13 @@ Run with: uv run python main.py
 import os
 import sys
 import time
+from pathlib import Path
 
-from data_pipeline import eodhd_client, synthetic, ingest
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from data_pipeline import synthetic, ingest
 from analytics import queries
 import visualize
 
@@ -31,26 +36,9 @@ BANNER = f"""
 ║   {BOLD}📈  findata-analytics{RESET}{BLUE}                                        ║
 ║   {DIM}Financial Data Pipeline & Quantitative Analytics{RESET}{BLUE}               ║
 ║                                                                  ║
+║   Python · DuckDB · SQL Window Functions · GBM · Backtesting     ║
+║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝{RESET}
-"""
-
-OVERVIEW = f"""
-{BOLD}What this project does:{RESET}
-  Pulls real market data (or generates synthetic data), stores it in
-  DuckDB, runs 10 SQL analytics functions, backtests a trading strategy,
-  and generates charts — all from this single program.
-
-{BOLD}How it works:{RESET}
-  {GREEN}Step 1:{RESET} Load data    → Fetch from EODHD API {DIM}or{RESET} generate synthetic
-  {GREEN}Step 2:{RESET} Store        → Insert into DuckDB (embedded SQL database)
-  {GREEN}Step 3:{RESET} Analyze      → Run SQL queries (window functions, CTEs, LAG)
-  {GREEN}Step 4:{RESET} Visualize    → Generate 6 charts to output/ folder
-
-{BOLD}Analytics included:{RESET}
-  • Daily returns          • Bollinger Bands (±2σ)
-  • 50 & 200-day MAs       • Golden Cross / Death Cross detection
-  • 30-day rolling vol     • Max drawdown from ATH
-  • Monthly & yearly rets  • MA crossover backtest vs buy-and-hold
 """
 
 
@@ -59,19 +47,52 @@ def clear_screen():
 
 
 def show_menu():
-    """Display the main menu and return the user's choice."""
+    """Display the simplified main menu."""
     print(f"""
 {BOLD}Choose a mode:{RESET}
 
-  {GREEN}[1]{RESET}  🌐  Fetch real data     {DIM}— Pull EOD stock data from EODHD API{RESET}
-  {GREEN}[2]{RESET}  🧪  Generate synthetic   {DIM}— Create GBM data + benchmark performance{RESET}
-  {GREEN}[3]{RESET}  📊  Analyze existing     {DIM}— Run analytics on a table already in DuckDB{RESET}
-  {GREEN}[4]{RESET}  🚀  Full pipeline        {DIM}— Fetch real data → analyze → charts (all-in-one){RESET}
-  {GREEN}[5]{RESET}  🧪  Synthetic pipeline   {DIM}— Generate data → analyze → charts (no API key){RESET}
+  {GREEN}[1]{RESET}  🚀  Quick Demo        {DIM}— Synthetic data → full analytics → charts (instant){RESET}
+  {GREEN}[2]{RESET}  📈  Real Market Data   {DIM}— Fetch live data from EODHD API → analytics → charts{RESET}
+  {GREEN}[3]{RESET}  📊  Analyze Existing   {DIM}— Re-run analytics on data already in DuckDB{RESET}
 
   {DIM}[q]  Quit{RESET}
 """)
-    return input(f"  {BOLD}Enter choice (1-5 or q): {RESET}").strip().lower()
+    return input(f"  {BOLD}Enter choice (1-3 or q): {RESET}").strip().lower()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# EODHD AUTO-PROMPT
+# ═══════════════════════════════════════════════════════════════════════
+
+def _has_eodhd_key() -> bool:
+    """Check if EODHD API key is set."""
+    val = os.environ.get("EODHD_API_KEY", "").strip()
+    return bool(val) and val != "your-eodhd-api-key-here"
+
+
+def _prompt_eodhd_key() -> bool:
+    """Prompt user for EODHD key. Returns True if key was set."""
+    print(f"""
+  {BOLD}📡 Real data requires an EODHD API key.{RESET}
+  {DIM}Get a free key at: https://eodhd.com/register{RESET}
+  {DIM}Or press Enter to go back to the menu.{RESET}
+""")
+    key = input(f"  {BOLD}EODHD API key: {RESET}").strip()
+
+    if not key:
+        return False
+
+    # Save to .env
+    env_path = Path(".env")
+    lines = []
+    if env_path.exists():
+        lines = [l for l in env_path.read_text().splitlines() if not l.startswith("EODHD_API_KEY=")]
+    lines.append(f"EODHD_API_KEY={key}")
+    env_path.write_text("\n".join(lines) + "\n")
+    os.environ["EODHD_API_KEY"] = key
+
+    print(f"\n  {GREEN}✅ Saved to .env — you won't be asked again.{RESET}\n")
+    return True
 
 
 def prompt_ticker():
@@ -99,7 +120,7 @@ def prompt_table():
     con.close()
 
     if not tables:
-        print(f"\n  {RED}No tables found in DuckDB. Load some data first (options 1, 2, 4, or 5).{RESET}\n")
+        print(f"\n  {RED}No tables found in DuckDB. Run a demo or fetch data first.{RESET}\n")
         return None
 
     print(f"\n  {BOLD}Available tables in DuckDB:{RESET}")
@@ -124,6 +145,8 @@ def prompt_table():
 
 def run_fetch(ticker: str, start: str, end: str) -> str | None:
     """Fetch real market data from EODHD API and store in DuckDB."""
+    from data_pipeline import eodhd_client
+
     table_name = f"{ticker.lower().replace('.', '_').replace('-', '_')}_eod"
 
     print(f"\n{BLUE}{'─'*60}{RESET}")
@@ -153,7 +176,7 @@ def run_synthetic() -> str:
     table_name = "synthetic_data"
 
     print(f"\n{BLUE}{'─'*60}{RESET}")
-    print(f"  {BOLD}🧪 Generating Synthetic Data (GBM){RESET}")
+    print(f"  {BOLD}🧪 Generating Synthetic Data (Geometric Brownian Motion){RESET}")
     print(f"{BLUE}{'─'*60}{RESET}\n")
 
     # Sequential (Pandas)
@@ -263,7 +286,14 @@ def run_analyze(table_name: str):
 def main():
     clear_screen()
     print(BANNER)
-    print(OVERVIEW)
+
+    print(f"""
+{BOLD}What this project does:{RESET}
+  Generates or fetches financial data, stores it in DuckDB, runs 10 SQL
+  analytics functions, backtests a trading strategy, and generates charts.
+
+  {GREEN}→ Press 1 and Enter for an instant demo (no API key needed){RESET}
+""")
 
     while True:
         choice = show_menu()
@@ -275,25 +305,15 @@ def main():
         t0 = time.perf_counter()
 
         if choice == "1":
-            # Fetch only
-            ticker = prompt_ticker()
-            if not ticker:
-                continue
-            start, end = prompt_dates()
-            run_fetch(ticker, start, end)
+            # Quick demo — synthetic → analyze → charts
+            table = run_synthetic()
+            run_analyze(table)
 
         elif choice == "2":
-            # Synthetic only
-            run_synthetic()
-
-        elif choice == "3":
-            # Analyze existing table
-            table = prompt_table()
-            if table:
-                run_analyze(table)
-
-        elif choice == "4":
-            # Full pipeline: fetch → analyze
+            # Real data — check for EODHD key
+            if not _has_eodhd_key():
+                if not _prompt_eodhd_key():
+                    continue
             ticker = prompt_ticker()
             if not ticker:
                 continue
@@ -302,13 +322,14 @@ def main():
             if table:
                 run_analyze(table)
 
-        elif choice == "5":
-            # Synthetic pipeline: generate → analyze
-            table = run_synthetic()
-            run_analyze(table)
+        elif choice == "3":
+            # Analyze existing table
+            table = prompt_table()
+            if table:
+                run_analyze(table)
 
         else:
-            print(f"\n  {RED}Invalid choice. Enter 1-5 or q.{RESET}")
+            print(f"\n  {RED}Invalid choice. Enter 1-3 or q.{RESET}")
             continue
 
         elapsed = time.perf_counter() - t0

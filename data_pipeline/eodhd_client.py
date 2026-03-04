@@ -17,7 +17,7 @@ def _get_client() -> APIClient:
     api_key = os.getenv("EODHD_API_KEY")
     if not api_key:
         raise SystemExit(
-            "Missing EODHD_API_KEY. Copy .env.example to .env and add your key.\n"
+            "Missing EODHD_API_KEY. Set it in your .env file or restart the program.\n"
             "Get a free key at: https://eodhd.com/register"
         )
     return APIClient(api_key)
